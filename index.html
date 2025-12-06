@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Modern Snake</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
+        * {
+            user-select: none;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Poppins', sans-serif;
+            flex-direction: column;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            color: #fff;
+        }
+
+        #gameCanvas {
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        #start, #end {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 100vw;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+        }
+
+        #end {
+            display: none;
+        }
+
+        h1, p {
+            margin: 10px 0;
+        }
+
+        #start p {
+            font-size: 24px;
+            font-weight: 400;
+            color: #a0a0a0;
+        }
+
+        #whatscore {
+            font-size: 32px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        #overtext {
+            font-size: 80px;
+            font-weight: 600;
+            background: linear-gradient(45deg, #ff0055, #ff5500);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(255, 0, 85, 0.3);
+            margin-bottom: 20px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .buttons {
+            font-family: 'Poppins', sans-serif;
+            font-size: 18px;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .buttons:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .clicked {
+            background: #4cc9f0;
+            color: #000;
+            border-color: #4cc9f0;
+            font-weight: 600;
+            box-shadow: 0 0 15px rgba(76, 201, 240, 0.4);
+        }
+
+        .clicked:hover {
+            background: #3db5db;
+            border-color: #3db5db;
+        }
+
+        #startb, #tryagain {
+            margin-top: 40px;
+            font-size: 24px;
+            padding: 15px 50px;
+            background: linear-gradient(45deg, #4cc9f0, #4361ee);
+            border: none;
+            font-weight: 600;
+            box-shadow: 0 0 20px rgba(67, 97, 238, 0.4);
+        }
+
+        #startb:hover, #tryagain:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 10px 30px rgba(67, 97, 238, 0.6);
+        }
+
+        #overlay {
+            position: absolute;
+            background-color: red;
+            height: 100%;
+            width: 100%;
+            z-index: 99;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="start" style="display: flex;">
+        <p>Choose size of the board:</p>
+        <div id="buttons1" class="button-group">
+            <button class="buttons" id="small">Small</button>
+            <button class="buttons clicked" id="medium">Medium</button>
+            <button class="buttons" id="large">Large</button>
+        </div>
+        <p>Choose snake speed:</p>
+        <div id="buttons2" class="button-group">
+            <button class="buttons" id="slow">Slow</button>
+            <button class="buttons clicked" id="normal">Normal</button>
+            <button class="buttons" id="fast">Fast</button>
+        </div>
+        <button class="buttons" id="startb">START</button>
+    </div>
+
+    <div id="end" style="display: none;">
+        <p id="overtext">GAME OVER</p>
+        <p id="whatscore"></p>
+        <button class="buttons" id="tryagain">Try again!</button>
+    </div>
+    <canvas id="gameCanvas" width="1280" height="720" style="display: none;"></canvas>
+
+    <script>
+
+        // Inicjalizacja gry
+        const canvas = document.getElementById("gameCanvas");
+        const context = canvas.getContext("2d");
+        const overlay = document.body;
+
+        // Ustawienia gry
+
+        const gridSize = 40;
+        let tileCountx = canvas.width / gridSize;
+        let tileCounty = canvas.height / gridSize;
+        let snake = new Array();
+        snake.push({ x: Math.floor((canvas.width / gridSize) / 2), y: Math.floor((canvas.height / gridSize) / 2) })
+
+        let apple = { x: 15, y: 10 };
+        let badApple = { x: 5, y: 10 };
+        let Mar = { x: 25, y: 10 };
+        let xVelocity = 0;
+        let yVelocity = 0;
+        let score = 0;
+        let gameSpeed = 100;
+        let nextxVelocity = 0;
+        let nextyVelocity = 0;
+
+        let deathflag = 0;
+
+        //Obrazki
+        const imgbody = new Image();
+        imgbody.src = 'img/body.png';
+        const imgheadr = new Image();
+        imgheadr.src = 'img/headright.png';
+        const imgheadl = new Image();
+        imgheadl.src = 'img/headleft.png';
+        const imgheadu = new Image();
+        imgheadu.src = 'img/headup.png';
+        const imgheadd = new Image();
+        imgheadd.src = 'img/headdown.png';
+        const imgheadstart = new Image();
+        imgheadstart.src = 'img/headstart.png';
+
+        document.getElementById("slow").addEventListener("click", function () {
+            gameSpeed = 150;
+            document.getElementById("slow").classList.add("clicked");
+            document.getElementById("normal").classList.remove("clicked");
+            document.getElementById("fast").classList.remove("clicked");
+        });
+        document.getElementById("normal").addEventListener("click", function () {
+            gameSpeed = 100;
+            document.getElementById("slow").classList.remove("clicked");
+            document.getElementById("normal").classList.add("clicked");
+            document.getElementById("fast").classList.remove("clicked");
+        });
+        document.getElementById("fast").addEventListener("click", function () {
+            gameSpeed = 50;
+            document.getElementById("slow").classList.remove("clicked");
+            document.getElementById("normal").classList.remove("clicked");
+            document.getElementById("fast").classList.add("clicked");
+        });
+
+        // Główna pętla gry
+        function gameLoop() {
+            deathflag = 0;
+            xVelocity = nextxVelocity;
+            yVelocity = nextyVelocity;
+            clearCanvas();
+            drawGrid();
+            moveSnake();
+            drawSnakeStart();
+            drawSnake();
+            drawApple();
+            drawBadApple();
+            drawMar();
+            drawScore();
+
+            if (isGameOver()) {
+                endGame();
+                return;
+            }
+
+            setTimeout(gameLoop, gameSpeed);
+        }
+
+        // Czyszczenie planszy
+        function clearCanvas() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            // context.fillStyle = "#333333";
+            // context.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Rysowanie siatki
+        function drawGrid() {
+            context.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            context.lineWidth = 0.5;
+
+            for (let x = 0; x <= canvas.width; x += gridSize) {
+                context.beginPath();
+                context.moveTo(x, 0);
+                context.lineTo(x, canvas.height);
+                context.stroke();
+            }
+
+            for (let y = 0; y <= canvas.height; y += gridSize) {
+                context.beginPath();
+                context.moveTo(0, y);
+                context.lineTo(canvas.width, y);
+                context.stroke();
+            }
+        }
+
+        // Poruszanie wężem
+        function moveSnake() {
+            const head = { x: snake[0].x + xVelocity, y: snake[0].y + yVelocity };
+            snake.unshift(head);
+
+            if (head.x === apple.x && head.y === apple.y) {
+                score++;
+                generateApple();
+                // checkGenerate();
+            } else if (head.x === badApple.x && head.y === badApple.y) {
+                score--;
+                snake.pop(head);
+                snake.pop(head);
+                overlay.style.filter = "blur(20px)";
+                setTimeout(function () {
+                    overlay.style.filter = "blur(0px)";
+                }, 5000)
+                generateBadApple();
+                // checkGenerate();
+            } else if (head.x === Mar.x && head.y === Mar.y) {
+                score--;
+                snake.pop(head);
+                snake.pop(head);
+                canvas.style.filter = `hue-rotate(${Math.floor(Math.random() * (360 - 180 + 1) + 180)}deg)`;
+                generateMar();
+                // checkGenerate();
+                setTimeout(function () {
+                    if (deathflag === 0) {
+                        canvas.style.filter = "hue-rotate(0deg)";
+                    }
+                }, 7000)
+            } else {
+                snake.pop();
+            }
+            if (score < 0) {
+                snake.pop();
+                score = 0;
+                overlay.style.setProperty("filter", "blur(0px)");
+                overlay.style.setProperty("filter", "brightness(100%)");
+                endGame();
+            }
+        }
+
+        // Rysowanie węża
+        function drawSnake() {
+            context.shadowBlur = 15;
+            context.shadowColor = "lime";
+            snake.forEach(segment => {
+                // context.fillStyle = "green";
+                // context.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+                // context.drawImage(imgbody, segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+                if (segment.x == snake[0].x && segment.y == snake[0].y) {
+                    // context.clearImage(0,0,gridSize,gridSize);
+                    // context.clearRect(segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+                    // context.fillStyle = "#333333";
+                    // context.fillRect(0, 0, canvas.width, canvas.height);
+                    if (yVelocity === -1) {
+                        context.drawImage(imgheadu, segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+                    }
+                    if (yVelocity === 1) {
+                        context.drawImage(imgheadd, segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+                    }
+                    if (xVelocity === -1) {
+                        context.drawImage(imgheadl, segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+                    }
+                    if (xVelocity === 1) {
+                        context.drawImage(imgheadr, segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+                    }
+                } else{
+                    context.drawImage(imgbody, segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+                }
+            });
+            context.shadowBlur = 0;
+        }
+
+        //Rysowanie głowy na start
+        function drawSnakeStart() {
+            snake.forEach(segment => {
+                if (segment.x == snake[0].x && segment.y == snake[0].y) {
+                    // const head = { x: snake[0].x + xVelocity, y: snake[0].y + yVelocity };
+                    context.drawImage(imgheadstart, segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+                }
+            });
+        }
+
+        // Rysowanie jabłka
+        function drawApple() {
+            context.fillStyle = "#ff3333";
+            context.shadowBlur = 20;
+            context.shadowColor = "#ff3333";
+            context.fillRect(apple.x * gridSize, apple.y * gridSize, gridSize, gridSize);
+            context.shadowBlur = 0;
+        }
+
+        // Rysowanie złego jabłka
+        function drawBadApple() {
+            context.fillStyle = "#aa00aa";
+            context.shadowBlur = 20;
+            context.shadowColor = "#aa00aa";
+            context.fillRect(badApple.x * gridSize, badApple.y * gridSize, gridSize, gridSize);
+            context.shadowBlur = 0;
+        }
+
+        //Rysowanie mar
+        function drawMar() {
+            context.fillStyle = "#ffff33";
+            context.shadowBlur = 20;
+            context.shadowColor = "#ffff33";
+            context.fillRect(Mar.x * gridSize, Mar.y * gridSize, gridSize, gridSize);
+            context.shadowBlur = 0;
+        }
+
+        // Generowanie nowego jabłka
+        function generateApple() {
+            apple = {
+                x: Math.floor(Math.random() * tileCountx),
+                y: Math.floor(Math.random() * tileCounty)
+            };
+            if((apple.x === Mar.x && apple.y === Mar.y) || (apple.x === badApple.x && apple.y === badApple.y)){
+                generateApple();
+            }
+            for(let i=0; i<snake.length; i++){
+                if(apple.x === snake[i].x && apple.y === snake[i].y){
+                    generateApple();
+                }
+            }
+        }
+
+        // Generowanie nowego złego jabłka
+        function generateBadApple() {
+            badApple = {
+                x: Math.floor(Math.random() * tileCountx),
+                y: Math.floor(Math.random() * tileCounty)
+            };
+            if((badApple.x === Mar.x && badApple.y === Mar.y) || (badApple.x === apple.x && badApple.y === apple.y)){
+                generateBadApple();
+            }
+            for(let i=0; i<snake.length; i++){
+                if(badApple.x === snake[i].x && badApple.y === snake[i].y){
+                    generateBadApple();
+                }
+            }
+        }
+
+        function generateMar() {
+            Mar = {
+                x: Math.floor(Math.random() * tileCountx),
+                y: Math.floor(Math.random() * tileCounty)
+            };
+            if((Mar.x === apple.x && Mar.y === apple.y) || (Mar.x === badApple.x && Mar.y === badApple.y)){
+                generateMar();
+            }
+            for(let i=0; i<snake.length; i++){
+                if(Mar.x === snake[i].x && Mar.y === snake[i].y){
+                    generateMar();
+                }
+            }
+        }
+
+        //Sprawdzanie generowania
+        // function checkGenerate(){
+        //     for(let i=0; i<snake.length; i++){
+        //         if(apple.x === snake[i].x && apple.y === snake[i].y){
+        //             generateApple();
+        //         }
+        //         if(badApple.x === snake[i].x && badApple.y === snake[i].y){
+        //             generateBadApple();
+        //         }
+        //         if(Mar.x === snake[i].x && Mar.y === snake[i].y){
+        //             generateMar();
+        //         }
+        //     }
+        // }
+
+        // Rysowanie wyniku
+        function drawScore() {
+            context.fillStyle = "white";
+            context.font = "600 32px 'Poppins', sans-serif";
+            context.shadowBlur = 10;
+            context.shadowColor = "white";
+            context.fillText("Score: " + score, 20, 40);
+            context.shadowBlur = 0;
+        }
+
+        // Sprawdzenie, czy gra się zakończyła
+        function isGameOver() {
+            const head = snake[0];
+            for (let i = 1; i < snake.length; i++) {
+                if (snake[i].x === head.x && snake[i].y === head.y) {
+                    return true;
+                }
+            }
+            return (
+                head.x < 0 ||
+                head.x >= tileCountx ||
+                head.y < 0 ||
+                head.y >= tileCounty
+            );
+        }
+
+        // Zakończenie gry
+        function endGame() {
+            deathflag = 1;
+            overlay.style.filter = "none";
+            canvas.style.filter = "none";
+            document.getElementById("end").style.display = "flex";
+            document.getElementById("whatscore").innerHTML = "Your score: " + score;
+            // alert("Game Over. Your score: " + score);
+            snake = [{ x: Math.floor((canvas.width / gridSize) / 2), y: Math.floor((canvas.height / gridSize) / 2) }];
+            apple = { x: 15, y: 10 };
+            badApple = { x: 5, y: 10 };
+            Mar = { x: 25, y: 10 };
+            xVelocity = 0;
+            yVelocity = 0;
+            score = 0;
+            generateApple();
+            generateBadApple();
+            generateMar();
+        }
+
+        // Obsługa klawiszy
+        document.addEventListener("keydown", changeDirection);
+
+        function changeDirection(event) {
+            const keyPressed = event.keyCode;
+            const goingUp = yVelocity === -1;
+            const goingDown = yVelocity === 1;
+            const goingLeft = xVelocity === -1;
+            const goingRight = xVelocity === 1;
+
+            if (keyPressed === 37 && !goingRight) {
+                nextxVelocity = -1;
+                nextyVelocity = 0;
+            }
+
+            if (keyPressed === 38 && !goingDown) {
+                nextxVelocity = 0;
+                nextyVelocity = -1;
+            }
+
+            if (keyPressed === 39 && !goingLeft) {
+                nextxVelocity = 1;
+                nextyVelocity = 0;
+            }
+
+            if (keyPressed === 40 && !goingUp) {
+                nextxVelocity = 0;
+                nextyVelocity = 1;
+            }
+        }
+
+
+        document.getElementById("small").addEventListener("click", function () {
+            document.getElementById("small").classList.add("clicked");
+            document.getElementById("medium").classList.remove("clicked");
+            document.getElementById("large").classList.remove("clicked");
+            nextxVelocity = 0;
+            nextyVelocity = 0;
+            canvas.width = 960;
+            canvas.height = 560;
+            snake = new Array();
+            snake.push({ x: Math.floor((canvas.width / gridSize) / 2), y: Math.floor((canvas.height / gridSize) / 2) })
+            tileCountx = canvas.width / gridSize;
+            tileCounty = canvas.height / gridSize;
+            generateApple();
+            generateBadApple();
+            generateMar();
+            // gameLoop();
+        });
+        document.getElementById("medium").addEventListener("click", function () {
+            document.getElementById("small").classList.remove("clicked");
+            document.getElementById("medium").classList.add("clicked");
+            document.getElementById("large").classList.remove("clicked");
+            nextxVelocity = 0;
+            nextyVelocity = 0;
+            canvas.width = 1280;
+            canvas.height = 720;
+            snake = new Array();
+            snake.push({ x: Math.floor((canvas.width / gridSize) / 2), y: Math.floor((canvas.height / gridSize) / 2) })
+            tileCountx = canvas.width / gridSize;
+            tileCounty = canvas.height / gridSize;
+            generateApple();
+            generateBadApple();
+            generateMar();
+        });
+        document.getElementById("large").addEventListener("click", function () {
+            document.getElementById("small").classList.remove("clicked");
+            document.getElementById("medium").classList.remove("clicked");
+            document.getElementById("large").classList.add("clicked");
+            nextxVelocity = 0;
+            nextyVelocity = 0;
+            canvas.width = 1600;
+            canvas.height = 880;
+            snake = new Array();
+            snake.push({ x: Math.floor((canvas.width / gridSize) / 2), y: Math.floor((canvas.height / gridSize) / 2) })
+            tileCountx = canvas.width / gridSize;
+            tileCounty = canvas.height / gridSize;
+            generateApple();
+            generateBadApple();
+            generateMar();
+        });
+
+
+
+        // Rozpoczęcie gry
+        document.querySelector("#startb").addEventListener("click", function () {
+            document.querySelector("#start").style.display = "none";
+            document.querySelector("#gameCanvas").style.display = "block";
+            generateApple();
+            generateBadApple();
+            generateMar();
+            gameLoop();
+        });
+
+        //Ekran końcowy
+        document.querySelector("#tryagain").addEventListener("click", function () {
+            document.querySelector("#end").style.display = "none";
+            document.querySelector("#gameCanvas").style.display = "none";
+            document.querySelector("#start").style.display = "flex";
+            xVelocity = 0;
+            yVelocity = 0;
+            nextxVelocity = 0;
+            nextyVelocity = 0;
+        });
+
+    </script>
+</body>
+
+</html>
